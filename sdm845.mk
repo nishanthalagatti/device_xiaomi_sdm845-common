@@ -164,8 +164,8 @@ PRODUCT_PACKAGES += \
     libqdMetaData.system \
     libtinyxml \
     libvulkan \
-    vendor.display.config@1.7 \
-    vendor.display.config@1.7.vendor \
+    vendor.display.config@1.9 \
+    vendor.display.config@1.9.vendor \
     memtrack.sdm845 \
     vendor.qti.hardware.display.allocator@1.0-service
 
@@ -275,10 +275,6 @@ PRODUCT_COPY_FILES += \
 # Net
 PRODUCT_PACKAGES += \
     netutils-wrapper-1.0
-
-# Perf
-PRODUCT_COPY_FILES += \
-    $(LOCAL_PATH)/configs/perfconfigstore.xml:$(TARGET_COPY_OUT_VENDOR)/etc/perf/perfconfigstore.xml
 
 # Power
 PRODUCT_PACKAGES += \
