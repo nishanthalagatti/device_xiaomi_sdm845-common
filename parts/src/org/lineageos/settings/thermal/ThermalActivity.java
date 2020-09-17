@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2020 The LineageOS Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,17 +14,20 @@
  * limitations under the License.
  */
 
-#ifndef POWER_LIBPERFMGR_CAMERAMODE_H_
-#define POWER_LIBPERFMGR_CAMERAMODE_H_
+package org.lineageos.settings.thermal;
 
-enum CameraStreamingMode {
-    CAMERA_STREAMING_OFF = 0,
-    CAMERA_STREAMING,
-    CAMERA_STREAMING_1080P,
-    CAMERA_STREAMING_60FPS,
-    CAMERA_STREAMING_4K,
-    CAMERA_STREAMING_SECURE,
-    CAMERA_STREAMING_MAX
-};
+import android.os.Bundle;
+import android.preference.PreferenceActivity;
 
-#endif  // POWER_LIBPERFMGR_CAMERAMODE_H_
+public class ThermalActivity extends PreferenceActivity {
+
+    private static final String TAG_THERMAL = "thermal";
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        getFragmentManager().beginTransaction().replace(android.R.id.content,
+                new ThermalSettingsFragment(), TAG_THERMAL).commit();
+    }
+}

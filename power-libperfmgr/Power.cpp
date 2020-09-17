@@ -28,12 +28,10 @@
 #include <utils/Log.h>
 #include <utils/Trace.h>
 
-#include "AudioStreaming.h"
 #include "Power.h"
 #include "display-helper.h"
 #include <linux/input.h>
 
-constexpr char kWakeupEventNode[] = "/dev/input/event2";
 constexpr int kWakeupModeOff = 4;
 constexpr int kWakeupModeOn = 5;
 
@@ -55,20 +53,12 @@ constexpr char kPowerHalInitProp[] = "vendor.powerhal.init";
 constexpr char kPowerHalRenderingProp[] = "vendor.powerhal.rendering";
 constexpr char kPowerHalConfigPath[] = "/vendor/etc/powerhint.json";
 
-static const std::map<enum CameraStreamingMode, std::string> kCamStreamingHint = {
-        {CAMERA_STREAMING_OFF, "CAMERA_STREAMING_OFF"},
-        {CAMERA_STREAMING, "CAMERA_STREAMING"},
-        {CAMERA_STREAMING_1080P, "CAMERA_STREAMING_1080P"},
-        {CAMERA_STREAMING_60FPS, "CAMERA_STREAMING_60FPS"},
-        {CAMERA_STREAMING_4K, "CAMERA_STREAMING_4K"},
-        {CAMERA_STREAMING_SECURE, "CAMERA_STREAMING_SECURE"}};
-
 Power::Power()
     : mHintManager(nullptr),
       mInteractionHandler(nullptr),
       mVRModeOn(false),
       mSustainedPerfModeOn(false),
-      mCameraStreamingMode(CAMERA_STREAMING_OFF),
+      mCameraStreamingMode(false),
       mReady(false) {
     mInitThread = std::thread([this]() {
         android::base::WaitForProperty(kPowerHalInitProp, "1");
@@ -82,23 +72,7 @@ Power::Power()
         if (state == "CAMERA_STREAMING") {
             ALOGI("Initialize with CAMERA_STREAMING on");
             mHintManager->DoHint("CAMERA_STREAMING");
-            mCameraStreamingMode = CAMERA_STREAMING;
-        } else if (state == "CAMERA_STREAMING_1080P") {
-            ALOGI("Initialize CAMERA_STREAMING_1080P on");
-            mHintManager->DoHint("CAMERA_STREAMING_1080P");
-            mCameraStreamingMode = CAMERA_STREAMING_1080P;
-        } else if (state == "CAMERA_STREAMING_60FPS") {
-            ALOGI("Initialize CAMERA_STREAMING_60FPS on");
-            mHintManager->DoHint("CAMERA_STREAMING_60FPS");
-            mCameraStreamingMode = CAMERA_STREAMING_60FPS;
-        } else if (state == "CAMERA_STREAMING_4K") {
-            ALOGI("Initialize with CAMERA_STREAMING_4K on");
-            mHintManager->DoHint("CAMERA_STREAMING_4K");
-            mCameraStreamingMode = CAMERA_STREAMING_4K;
-        } else if (state == "CAMERA_STREAMING_SECURE") {
-            ALOGI("Initialize with CAMERA_STREAMING_SECURE on");
-            mHintManager->DoHint("CAMERA_STREAMING_SECURE");
-            mCameraStreamingMode = CAMERA_STREAMING_SECURE;
+            mCameraStreamingMode = true;
         } else if (state == "SUSTAINED_PERFORMANCE") {
             ALOGI("Initialize with SUSTAINED_PERFORMANCE on");
             mHintManager->DoHint("SUSTAINED_PERFORMANCE");
@@ -217,10 +191,49 @@ Return<void> Power::powerHint(PowerHint_1_0 hint, int32_t data) {
     return Void();
 }
 
+int open_ts_input() {
+    int fd = -1;
+    DIR *dir = opendir("/dev/input");
+
+    if (dir != NULL) {
+        struct dirent *ent;
+
+        while ((ent = readdir(dir)) != NULL) {
+            if (ent->d_type == DT_CHR) {
+                char absolute_path[PATH_MAX] = {0};
+                char name[80] = {0};
+
+                strcpy(absolute_path, "/dev/input/");
+                strcat(absolute_path, ent->d_name);
+
+                fd = open(absolute_path, O_RDWR);
+                if (ioctl(fd, EVIOCGNAME(sizeof(name) - 1), &name) > 0) {
+                    if (strcmp(name, "atmel_mxt_ts") == 0 || strcmp(name, "fts_ts") == 0 ||
+                            strcmp(name, "fts") == 0 || strcmp(name, "ft5x46") == 0 ||
+                            strcmp(name, "synaptics_dsx") == 0 ||
+                            strcmp(name, "NVTCapacitiveTouchScreen") == 0)
+                        break;
+                }
+
+                close(fd);
+                fd = -1;
+            }
+        }
+
+        closedir(dir);
+    }
+
+    return fd;
+}
+
 Return<void> Power::setFeature(Feature feature, bool activate) {
     switch (feature) {
         case Feature::POWER_FEATURE_DOUBLE_TAP_TO_WAKE: {
-            int fd = open(kWakeupEventNode, O_RDWR);
+            int fd = open_ts_input();
+            if (fd == -1) {
+                ALOGW("DT2W won't work because no supported touchscreen input devices were found");
+                return Void();
+            }
             struct input_event ev;
             ev.type = EV_SYN;
             ev.code = SYN_CONFIG;
@@ -275,21 +288,10 @@ Return<void> Power::powerHintAsync_1_2(PowerHint_1_2 hint, int32_t data) {
             if (mVRModeOn || mSustainedPerfModeOn) {
                 ALOGV("%s: ignoring due to other active perf hints", __func__);
             } else {
-                if (data == static_cast<int32_t>(AUDIO_STREAMING_HINT::AUDIO_STREAMING_ON)) {
+                if (data) {
                     mHintManager->DoHint("AUDIO_STREAMING");
-                } else if (data ==
-                           static_cast<int32_t>(AUDIO_STREAMING_HINT::AUDIO_STREAMING_OFF)) {
-                    mHintManager->EndHint("AUDIO_STREAMING");
-                } else if (data == static_cast<int32_t>(AUDIO_STREAMING_HINT::TPU_BOOST_SHORT)) {
-                    mHintManager->DoHint("TPU_BOOST",
-                                         std::chrono::milliseconds(TPU_HINT_DURATION_MS::SHORT));
-                } else if (data == static_cast<int32_t>(AUDIO_STREAMING_HINT::TPU_BOOST_LONG)) {
-                    mHintManager->DoHint("TPU_BOOST",
-                                         std::chrono::milliseconds(TPU_HINT_DURATION_MS::LONG));
-                } else if (data == static_cast<int32_t>(AUDIO_STREAMING_HINT::TPU_BOOST_OFF)) {
-                    mHintManager->EndHint("TPU_BOOST");
                 } else {
-                    ALOGE("AUDIO STREAMING INVALID DATA: %d", data);
+                    mHintManager->EndHint("AUDIO_STREAMING");
                 }
             }
             break;
@@ -303,34 +305,17 @@ Return<void> Power::powerHintAsync_1_2(PowerHint_1_2 hint, int32_t data) {
             }
             break;
         case PowerHint_1_2::CAMERA_STREAMING: {
-            const enum CameraStreamingMode mode = static_cast<enum CameraStreamingMode>(data);
-            if (mode < CAMERA_STREAMING_OFF || mode >= CAMERA_STREAMING_MAX) {
-                ALOGE("CAMERA STREAMING INVALID Mode: %d", mode);
-                break;
+            if (data > 0) {
+                mHintManager->DoHint("CAMERA_STREAMING");
+                mCameraStreamingMode = true;
+            } else {
+                mHintManager->EndHint("CAMERA_STREAMING");
+                mCameraStreamingMode = false;
             }
 
-            if (mCameraStreamingMode == mode)
-                break;
-
-            // turn it off first if any previous hint.
-            if ((mCameraStreamingMode != CAMERA_STREAMING_OFF)) {
-                const auto modeValue = kCamStreamingHint.at(mCameraStreamingMode);
-                mHintManager->EndHint(modeValue);
-                if ((mCameraStreamingMode != CAMERA_STREAMING_SECURE)) {
-                    // Boost 1s for tear down if not secure streaming use case
-                    mHintManager->DoHint("CAMERA_LAUNCH", std::chrono::seconds(1));
-                }
-            }
-
-            if (mode != CAMERA_STREAMING_OFF) {
-                const auto hintValue = kCamStreamingHint.at(mode);
-                mHintManager->DoHint(hintValue);
-            }
-
-            mCameraStreamingMode = mode;
-            const auto prop = (mCameraStreamingMode == CAMERA_STREAMING_OFF)
-                                  ? ""
-                                  : kCamStreamingHint.at(mode).c_str();
+            const auto prop = mCameraStreamingMode
+                                  ? "CAMERA_STREAMING"
+                                  : "";
             if (!android::base::SetProperty(kPowerHalStateProp, prop)) {
                 ALOGE("%s: could set powerHAL state %s property", __func__, prop);
             }
@@ -388,7 +373,7 @@ Return<void> Power::debug(const hidl_handle &handle, const hidl_vec<hidl_string>
             "CameraStreamingMode: %s\n"
             "SustainedPerformanceMode: %s\n",
             boolToString(mHintManager->IsRunning()), boolToString(mVRModeOn),
-            kCamStreamingHint.at(mCameraStreamingMode).c_str(),
+            boolToString(mCameraStreamingMode),
             boolToString(mSustainedPerfModeOn)));
         // Dump nodes through libperfmgr
         mHintManager->DumpToFd(fd);
