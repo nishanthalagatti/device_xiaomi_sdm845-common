@@ -99,7 +99,7 @@ vendor/lib/vendor.qti.hardware.bluetooth_sar@1.0.so
 product/lib64/libaptX_encoder.so|df1c89d7af1bb35808d5fe3496b04ba066c10cbc
 product/lib64/libaptXHD_encoder.so|e13fa70c97caaa24d061678bdee608eb8850a69e
 
-# CarrierSettings - from coral - RP1A.200720.009
+# CarrierSettings - from coral - RP1A.201105.002
 product/etc/CarrierSettings/airtel_in.pb|8fa5ae3f24de203154d590b6a1534cf2c7116eb3
 product/etc/CarrierSettings/apt_tw.pb|929caebf49329e98c219ea741e2e1105085e9e40
 product/etc/CarrierSettings/att5g_us.pb|bef374e1308eee5bc959a6587f31a369510bd51a
@@ -200,7 +200,7 @@ product/etc/CarrierSettings/vodafone_it.pb|606afa9d22ae336d25e145bfd462581fa9396
 product/etc/CarrierSettings/vodafone_nl.pb|b171ae2a1866dedc686d0d64fab2597c23225c46
 product/etc/CarrierSettings/vodafone_tr.pb|c8f9dad785970690a0042ec9ee15907049e20b5b
 product/etc/CarrierSettings/xfinity_us.pb|ee2fb3dfcd18a89a215a1fa748a03f5f278bda91
--product/priv-app/CarrierSettings/CarrierSettings.apk|2fce902429037b51edf651f21b843ccfef9d199e
+-product/priv-app/CarrierSettings/CarrierSettings.apk|8e409e63d88f42e8e2605921dc404d6d54dac8eb
 
 # CDSP
 vendor/bin/cdsprpcd
